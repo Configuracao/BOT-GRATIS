@@ -1,0 +1,3 @@
+{
+"GATESCCNPASSWORD": "1350"
+}
