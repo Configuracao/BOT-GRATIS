@@ -1,18 +1,17 @@
 #!/bin/bash
 
-# Función para mostrar la ayuda
 function mostrar_ayuda {
-    echo "Uso: $0 [-u usuario] [-p contraseña] [-d dias] [-c conexiones]"
+    echo "Uso: $0 [-u usuario] [-p contraseña] [-d dias] [-c conexiones] [-t tipo]"
     echo "Opciones:"
     echo "  -h, --help           Mostrar esta ayuda"
-    echo "  -u, --user           Especificar un nombre de usuario"
-    echo "  -p, --pass           Especificar una contraseña"
-    echo "  -d, --dias           Cantidad de días de validez"
-    echo "  -c, --coneccion      Número de conexiones simultáneas permitidas"
+    echo "  -u, --user           Nombre de usuario"
+    echo "  -p, --pass           Contraseña"
+    echo "  -d, --dias           Días de validez"
+    echo "  -c, --coneccion      Conexiones permitidas"
+    echo "  -t, --tipouser       Tipo de usuario (opcional)"
     exit 1
 }
 
-# Verificar que se ejecuta como root
 if [ "$(id -u)" -ne 0 ]; then
     echo "Este script debe ejecutarse como root"
     exit 1
@@ -23,52 +22,55 @@ USUARIO=""
 CONTRASENA=""
 DIAS=30
 CONECCIONES=1
-DB_PATH="/etc/SSHPlus/usuarios.db"
+TIPO="normal"
 
-# Procesar argumentos
 while [[ "$1" != "" ]]; do
     case $1 in
-        -h | --help) mostrar_ayuda ;;
-        -u | --user) shift; USUARIO=$1 ;;
-        -p | --pass) shift; CONTRASENA=$1 ;;
-        -d | --dias) shift; DIAS=$1 ;;
-        -c | --coneccion) shift; CONECCIONES=$1 ;;
-        *) echo "Opción no válida: $1"; mostrar_ayuda ;;
+        -h|--help) mostrar_ayuda ;;
+        -u|--user) shift; USUARIO="$1" ;;
+        -p|--pass) shift; CONTRASENA="$1" ;;
+        -d|--dias) shift; DIAS="$1" ;;
+        -c|--coneccion) shift; CONECCIONES="$1" ;;
+        -t|--tipouser) shift; TIPO="$1" ;;
+        *) echo "Opción inválida: $1"; mostrar_ayuda ;;
     esac
     shift
 done
 
-# Verificar campos obligatorios
 if [ -z "$USUARIO" ] || [ -z "$CONTRASENA" ]; then
-    echo "Se debe especificar un nombre de usuario y una contraseña."
+    echo "Usuario y contraseña son obligatorios."
     mostrar_ayuda
 fi
 
-# Crear usuario
-EXPIRA=$(date -d "$DIAS days" +%Y-%m-%d)
-useradd -M -s /bin/false -e "$EXPIRA" "$USUARIO"
+# Verificar si ya existe
+if id "$USUARIO" &>/dev/null; then
+    echo "El usuario '$USUARIO' ya existe."
+    exit 1
+fi
+
+# Crear el usuario con expiración
+useradd -M -s /bin/false -e $(date -d "$DIAS days" +%Y-%m-%d) "$USUARIO"
 echo "$USUARIO:$CONTRASENA" | chpasswd
 
-# Limitar conexiones individuales
-sed -i "/^$USUARIO .* maxlogins/d" /etc/security/limits.conf
-echo "$USUARIO hard maxlogins $CONECCIONES" >> /etc/security/limits.conf
+# Registrar en la base de datos SSHPLUS
+DB_PATH="/etc/SSHPlus/usuarios.db"
+FECHA_EXPIRA=$(date -d "$DIAS days" +"%d-%m-%Y")
 
-# Asegurar que pam_limits esté activo
-grep -q "pam_limits.so" /etc/pam.d/sshd || echo "session required pam_limits.so" >> /etc/pam.d/sshd
-systemctl restart sshd
+if [ -d "/etc/SSHPlus" ]; then
+    echo "$USUARIO|$CONTRASENA|$FECHA_EXPIRA|$CONECCIONES" >> "$DB_PATH"
+fi
 
-# Guardar en usuarios.db
-mkdir -p "$(dirname "$DB_PATH")"
-EXPIRA_HUMANA=$(date -d "$DIAS days" +"%d-%m-%Y")
-echo "$USUARIO|$CONTRASENA|$EXPIRA_HUMANA|$CONECCIONES" >> "$DB_PATH"
+# Limitar conexiones por usuario
+LIMITS_FILE="/etc/security/limits.conf"
+echo "$USUARIO hard maxlogins $CONECCIONES" >> "$LIMITS_FILE"
 
-# Mostrar info
+# Mostrar resumen
 echo ""
-echo "Usuario creado exitosamente:"
-echo "-----------------------------"
+echo "Usuario creado:"
+echo "------------------------"
 echo "Usuario     : $USUARIO"
 echo "Contraseña  : $CONTRASENA"
-echo "Expira el   : $EXPIRA_HUMANA"
-echo "Conexiones  : $CONECCIONES"
-echo "Guardado en : $DB_PATH"
-echo "-----------------------------"
+echo "Expira el   : $FECHA_EXPIRA"
+echo "Tipo        : $TIPO"
+echo "Límite SSH  : $CONECCIONES conexiones"
+echo "------------------------"
