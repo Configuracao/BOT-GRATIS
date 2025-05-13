@@ -64,7 +64,7 @@ useradd -M -s /bin/false -e $(date -d "$DIAS days" +%Y-%m-%d) "$USUARIO"
 echo "$USUARIO:$CONTRASENA" | chpasswd
 
 # Guardar en el orden esperado por la app
-echo "$USUARIO $CONTRASENA $CONECCIONES $TIPO $DIAS" >> "$DB_PATH"
+echo "$USUARIO $CONTRASENA $TIPO $DIAS $CONECCIONES" >> "$DB_PATH"
 
 # Mostrar info
 FECHA_EXPIRA=$(chage -l "$USUARIO" | grep "Account expires" | cut -d: -f2)
