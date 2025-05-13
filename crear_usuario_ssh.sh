@@ -48,7 +48,6 @@ fi
 DB_PATH="/root/usuarios.db"
 
 if [ "$ELIMINAR" -eq 1 ]; then
-    # Eliminar usuario
     userdel -f "$USUARIO"
     sed -i "/^$USUARIO /d" "$DB_PATH"
     echo "Usuario '$USUARIO' eliminado correctamente."
@@ -60,14 +59,14 @@ if [ -z "$CONTRASENA" ]; then
     mostrar_ayuda
 fi
 
-# Crear el usuario
+# Crear el usuario SSH
 useradd -M -s /bin/false -e $(date -d "$DIAS days" +%Y-%m-%d) "$USUARIO"
 echo "$USUARIO:$CONTRASENA" | chpasswd
 
-# Registrar en base de datos
-echo "$USUARIO $DIAS $CONECCIONES $TIPO" >> "$DB_PATH"
+# Guardar en el orden esperado por la app
+echo "$USUARIO $CONTRASENA $CONECCIONES $TIPO $DIAS" >> "$DB_PATH"
 
-# Mostrar información
+# Mostrar info
 FECHA_EXPIRA=$(chage -l "$USUARIO" | grep "Account expires" | cut -d: -f2)
 echo ""
 echo "Usuario creado:"
@@ -77,4 +76,5 @@ echo "Contraseña  : $CONTRASENA"
 echo "Expira el   : $FECHA_EXPIRA"
 echo "Conexiones  : $CONECCIONES"
 echo "Tipo        : $TIPO"
+echo "Días        : $DIAS"
 echo "------------------------"
