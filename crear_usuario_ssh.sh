@@ -42,35 +42,24 @@ if [ -z "$USUARIO" ] || [ -z "$CONTRASENA" ]; then
     mostrar_ayuda
 fi
 
-# Verificar si ya existe
-if id "$USUARIO" &>/dev/null; then
-    echo "El usuario '$USUARIO' ya existe."
-    exit 1
-fi
-
-# Crear el usuario con expiración
+# Crear el usuario
 useradd -M -s /bin/false -e $(date -d "$DIAS days" +%Y-%m-%d) "$USUARIO"
 echo "$USUARIO:$CONTRASENA" | chpasswd
 
-# Registrar en la base de datos SSHPLUS
-DB_PATH="/etc/SSHPlus/usuarios.db"
-FECHA_EXPIRA=$(date -d "$DIAS days" +"%d-%m-%Y")
+# Registrar en base de datos usada por SSHPLUS
+DB_PATH="/root/usuarios.db"
+echo "$USUARIO $DIAS $CONECCIONES $TIPO" >> "$DB_PATH"
 
-if [ -d "/etc/SSHPlus" ]; then
-    echo "$USUARIO|$CONTRASENA|$FECHA_EXPIRA|$CONECCIONES" >> "$DB_PATH"
-fi
-
-# Limitar conexiones por usuario
-LIMITS_FILE="/etc/security/limits.conf"
-echo "$USUARIO hard maxlogins $CONECCIONES" >> "$LIMITS_FILE"
-
-# Mostrar resumen
+# Mostrar información
+FECHA_EXPIRA=$(chage -l "$USUARIO" | grep "Account expires" | cut -d: -f2)
 echo ""
 echo "Usuario creado:"
 echo "------------------------"
 echo "Usuario     : $USUARIO"
 echo "Contraseña  : $CONTRASENA"
 echo "Expira el   : $FECHA_EXPIRA"
+echo "Conexiones  : $CONECCIONES"
 echo "Tipo        : $TIPO"
-echo "Límite SSH  : $CONECCIONES conexiones"
 echo "------------------------"
+
+# IMPORTANTE: El control de conexiones simultáneas por usuario DEBE hacerse con scripts que monitorean conexiones activas (como hace SSHPLUS).
