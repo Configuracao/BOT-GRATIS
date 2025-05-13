@@ -20,18 +20,19 @@ fi
 # Valores por defecto
 USUARIO=""
 CONTRASENA=""
-DIAS=30
+DIAS=""
 CONECCIONES=1
 ELIMINAR=0
 
+# Procesar parámetros
 while [[ "$1" != "" ]]; do
-    case $1 in
-        -h|--help) mostrar_ayuda ;;
+    case "$1" in
         -u|--user) shift; USUARIO="$1" ;;
         -p|--pass) shift; CONTRASENA="$1" ;;
         -d|--dias) shift; DIAS="$1" ;;
         -c|--coneccion) shift; CONECCIONES="$1" ;;
         --delete) ELIMINAR=1 ;;
+        -h|--help) mostrar_ayuda ;;
         *) echo "Opción inválida: $1"; mostrar_ayuda ;;
     esac
     shift
@@ -39,30 +40,29 @@ done
 
 DB_PATH="/root/usuarios.db"
 
-if [ -z "$USUARIO" ]; then
-    echo "Debes especificar un nombre de usuario con -u"
-    mostrar_ayuda
-fi
-
 if [ "$ELIMINAR" -eq 1 ]; then
+    if [ -z "$USUARIO" ]; then
+        echo "Debes especificar el usuario a eliminar con -u"
+        exit 1
+    fi
     userdel -f "$USUARIO" && sed -i "/^$USUARIO /d" "$DB_PATH"
     echo "Usuario '$USUARIO' eliminado correctamente."
     exit 0
 fi
 
-if [ -z "$CONTRASENA" ]; then
-    echo "Debes especificar una contraseña con -p"
+if [ -z "$USUARIO" ] || [ -z "$CONTRASENA" ] || [ -z "$DIAS" ]; then
+    echo "Faltan parámetros obligatorios."
     mostrar_ayuda
 fi
 
-# Crear el usuario SSH
+# Crear usuario
 useradd -M -s /bin/false -e $(date -d "$DIAS days" +%Y-%m-%d) "$USUARIO"
 echo "$USUARIO:$CONTRASENA" | chpasswd
 
-# Registrar en base de datos
+# Guardar datos
 echo "$USUARIO $DIAS $CONECCIONES" >> "$DB_PATH"
 
-# Mostrar información
+# Mostrar resultado
 FECHA_EXPIRA=$(chage -l "$USUARIO" | grep "Account expires" | cut -d: -f2 | xargs)
 echo ""
 echo "Usuario creado:"
