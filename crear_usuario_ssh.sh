@@ -37,16 +37,15 @@ while [[ "$1" != "" ]]; do
     shift
 done
 
+DB_PATH="/root/usuarios.db"
+
 if [ -z "$USUARIO" ]; then
     echo "Debes especificar un nombre de usuario con -u"
     mostrar_ayuda
 fi
 
-DB_PATH="/root/usuarios.db"
-
 if [ "$ELIMINAR" -eq 1 ]; then
-    userdel -f "$USUARIO"
-    sed -i "/^$USUARIO /d" "$DB_PATH"
+    userdel -f "$USUARIO" && sed -i "/^$USUARIO /d" "$DB_PATH"
     echo "Usuario '$USUARIO' eliminado correctamente."
     exit 0
 fi
@@ -56,20 +55,21 @@ if [ -z "$CONTRASENA" ]; then
     mostrar_ayuda
 fi
 
-# Crear usuario con expiración
+# Crear el usuario SSH
 useradd -M -s /bin/false -e $(date -d "$DIAS days" +%Y-%m-%d) "$USUARIO"
 echo "$USUARIO:$CONTRASENA" | chpasswd
 
 # Registrar en base de datos
-echo "$USUARIO $CONTRASENA $CONECCIONES $DIAS" >> "$DB_PATH"
+echo "$USUARIO $DIAS $CONECCIONES" >> "$DB_PATH"
 
 # Mostrar información
-FECHA_EXPIRA=$(chage -l "$USUARIO" | grep "Account expires" | cut -d: -f2)
+FECHA_EXPIRA=$(chage -l "$USUARIO" | grep "Account expires" | cut -d: -f2 | xargs)
 echo ""
 echo "Usuario creado:"
 echo "------------------------"
 echo "Usuario     : $USUARIO"
 echo "Contraseña  : $CONTRASENA"
-echo "Expira el   : $FECHA_EXPIRA"
+echo "Días        : $DIAS"
 echo "Conexiones  : $CONECCIONES"
+echo "Expira el   : $FECHA_EXPIRA"
 echo "------------------------"
